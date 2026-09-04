@@ -1,0 +1,397 @@
+// Bitcoin Investment — database schema
+// Every financial-state field is written only by server-side services in
+// src/lib — the frontend never has a code path that mutates balances,
+// order status, or ledger entries directly.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- Identity
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  emailVerifiedAt   DateTime?
+  passwordHash      String
+  fullName          String
+  country           String
+  phone             String?
+  referralCode      String?   @unique
+  referredById      String?
+  referredBy        User?     @relation("Referrals", fields: [referredById], references: [id])
+  referrals         User[]    @relation("Referrals")
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String?
+  status            UserStatus @default(ACTIVE)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sessions          Session[]
+  devices           Device[]
+  kycCase           KycCase?
+  portfolio         Portfolio?
+  deposits          Deposit[]
+  investmentOrders  InvestmentOrder[]
+  withdrawals       Withdrawal[]
+  notifications     Notification[]
+  supportTickets    SupportTicket[]
+  telegramAccount   TelegramAccount?
+  auditLogs         AuditLog[]
+  complianceAlerts  ComplianceAlert[]
+}
+
+enum UserStatus {
+  ACTIVE
+  FROZEN
+  RESTRICTED
+  CLOSED
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  deviceId  String?
+  device    Device?  @relation(fields: [deviceId], references: [id])
+  ipAddress String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Device {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  label      String?
+  userAgent  String?
+  lastSeenAt DateTime  @default(now())
+  trusted    Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  sessions   Session[]
+}
+
+// --------------------------------------------------------------------- KYC
+
+model KycCase {
+  id          String     @id @default(uuid())
+  userId      String     @unique
+  user        User       @relation(fields: [userId], references: [id])
+  status      KycStatus  @default(NOT_STARTED)
+  provider    String?
+  providerRef String?
+  dateOfBirth DateTime?
+  riskLevel   String?
+  reviewedById String?
+  reviewedAt  DateTime?
+  documents   KycDocument[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  APPROVED
+  REJECTED
+  REQUIRES_REVIEW
+}
+
+model KycDocument {
+  id          String   @id @default(uuid())
+  kycCaseId   String
+  kycCase     KycCase  @relation(fields: [kycCaseId], references: [id])
+  type        String   // passport, national_id, proof_of_address, selfie, etc.
+  providerRef String?  // reference in the external KYC provider — never store raw ID images here
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+}
+
+// --------------------------------------------------------------- Portfolio
+
+model Portfolio {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  btcHoldings    Decimal  @default(0) @db.Decimal(20, 8)
+  totalInvested  Decimal  @default(0) @db.Decimal(20, 2)
+  availableUsd   Decimal  @default(0) @db.Decimal(20, 2)
+  pendingUsd     Decimal  @default(0) @db.Decimal(20, 2)
+  updatedAt      DateTime @updatedAt
+}
+
+model Asset {
+  id     String @id @default(uuid())
+  symbol String @unique // e.g. BTC, USD
+  name   String
+}
+
+model Wallet {
+  id            String   @id @default(uuid())
+  label         String
+  custodyProvider String // abstraction only — never store private keys here
+  network       String?
+  isPlatformHot Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+// ------------------------------------------------------------------ Ledger
+
+// Double-entry ledger. Every financial event writes >=2 balanced LedgerEntry
+// rows referencing LedgerAccount rows. No frontend code path writes here.
+model LedgerAccount {
+  id       String  @id @default(uuid())
+  name     String  @unique // e.g. "user:{id}:usd", "platform:btc_custody", "platform:fees_revenue"
+  currency String
+  entries  LedgerEntry[]
+}
+
+model LedgerEntry {
+  id          String        @id @default(uuid())
+  accountId   String
+  account     LedgerAccount @relation(fields: [accountId], references: [id])
+  amount      Decimal       @db.Decimal(24, 8) // positive = debit, negative = credit, by convention
+  currency    String
+  refType     String        // "deposit", "investment_order", "withdrawal", "fee", "adjustment"
+  refId       String
+  memo        String?
+  createdAt   DateTime      @default(now())
+
+  @@index([refType, refId])
+}
+
+// ---------------------------------------------------------------- Deposits
+
+model Deposit {
+  id               String        @id @default(uuid())
+  userId           String
+  user             User          @relation(fields: [userId], references: [id])
+  amount           Decimal       @db.Decimal(20, 2)
+  currency         String
+  method           String        // bank, card, stablecoin, bitcoin
+  status           DepositStatus @default(PENDING)
+  providerRef      String?
+  transactionRef   String        @unique @default(uuid())
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+enum DepositStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+// --------------------------------------------------------- Investment flow
+
+model InvestmentOrder {
+  id             String      @id @default(uuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id])
+  amountUsd      Decimal     @db.Decimal(20, 2)
+  feeUsd         Decimal     @db.Decimal(20, 2) @default(0)
+  btcPriceUsed   Decimal     @db.Decimal(20, 2)
+  estimatedBtc   Decimal     @db.Decimal(20, 8)
+  status         OrderStatus @default(PENDING)
+  execution      Execution?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  EXECUTED
+  FAILED
+  CANCELLED
+}
+
+// Only written after a real (or, in sandbox mode, clearly simulated) provider
+// confirms execution. Never populated speculatively.
+model Execution {
+  id                String          @id @default(uuid())
+  orderId           String          @unique
+  order             InvestmentOrder @relation(fields: [orderId], references: [id])
+  btcAmount         Decimal         @db.Decimal(20, 8)
+  executionPriceUsd Decimal         @db.Decimal(20, 2)
+  providerRef       String?
+  sandbox           Boolean         @default(true)
+  executedAt        DateTime        @default(now())
+}
+
+// -------------------------------------------------------------- Withdrawal
+
+model Withdrawal {
+  id              String           @id @default(uuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+  btcAmount       Decimal          @db.Decimal(20, 8)
+  destinationAddr String
+  network         String
+  status          WithdrawalStatus @default(REQUESTED)
+  blockchainHash  String?          // only ever set after a real broadcast
+  sandbox         Boolean          @default(true)
+  reviewedById    String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+enum WithdrawalStatus {
+  REQUESTED
+  UNDER_REVIEW
+  APPROVED
+  PROCESSING
+  BROADCAST
+  CONFIRMED
+  REJECTED
+  CANCELLED
+}
+
+model Fee {
+  id          String   @id @default(uuid())
+  type        String   // deposit, investment, management, withdrawal, network
+  amountUsd   Decimal  @db.Decimal(20, 2)
+  refType     String
+  refId       String
+  createdAt   DateTime @default(now())
+}
+
+// ----------------------------------------------------------- Notifications
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  channel   String   // email, in_app, telegram, sms
+  category  String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+// --------------------------------------------------------------- Support
+
+model SupportTicket {
+  id        String       @id @default(uuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  category  String
+  priority  String       @default("normal")
+  status    TicketStatus @default(OPEN)
+  subject   String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  messages  SupportMessage[]
+}
+
+enum TicketStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+model SupportMessage {
+  id        String        @id @default(uuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  authorType String       // "user" | "admin"
+  body      String
+  createdAt DateTime      @default(now())
+}
+
+// -------------------------------------------------------------- Telegram
+
+model TelegramAccount {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id])
+  telegramId String   @unique
+  username   String?
+  linkedAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------------- Market
+
+model MarketPrice {
+  id        String   @id @default(uuid())
+  symbol    String   // "BTC-USD"
+  price     Decimal  @db.Decimal(20, 2)
+  change24h Decimal  @db.Decimal(6, 2)
+  source    String
+  fetchedAt DateTime @default(now())
+
+  @@index([symbol, fetchedAt])
+}
+
+// ------------------------------------------------------------- Compliance
+
+model ComplianceAlert {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  type        String   // sanctions_hit, velocity, large_withdrawal, geo_restriction, manual_flag
+  severity    String   // low, medium, high, critical
+  status      String   @default("open") // open, reviewing, cleared, escalated
+  details     String?
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorType  String   // "user" | "admin" | "system"
+  actorId    String?
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorType, actorId])
+}
+
+// -------------------------------------------------------------------- Admin
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  roleId       String
+  role         Role     @relation(fields: [roleId], references: [id])
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
+model Role {
+  id          String       @id @default(uuid())
+  name        String       @unique // super_admin, compliance_admin, finance_admin, support_admin, analyst, auditor
+  permissions Permission[]
+  admins      AdminUser[]
+}
+
+model Permission {
+  id     String @id @default(uuid())
+  key    String @unique // e.g. "users.freeze", "withdrawals.approve", "config.update"
+  roles  Role[]
+}
+
+// --------------------------------------------------------- Platform config
+
+// Admin-editable settings — lets non-engineers change min investment,
+// fees, and the strategy description without a code deploy.
+model PlatformConfig {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}

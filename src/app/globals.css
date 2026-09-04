@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #F7F5F1;
+  --panel: #FFFFFF;
+  --panel-2: #F1EEE8;
+  --paper: #14171B;
+  --muted: #6B7280;
+  --orange: #E8791A;
+  --orange-dim: #F3D9BC;
+  --green: #12875E;
+  --red: #C23B3B;
+  --line: #E4E0D8;
+}
+
+.dark {
+  --bg: #0A0C0F;
+  --panel: #111417;
+  --panel-2: #14181C;
+  --paper: #F2EFE9;
+  --muted: #8B93A1;
+  --orange: #F7931A;
+  --orange-dim: #6B4A15;
+  --green: #1FC98B;
+  --red: #E5484D;
+  --line: #23272D;
+}
+
+:root {
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 8px 24px -8px rgba(0,0,0,0.18);
+  --shadow-lg: 0 24px 60px -16px rgba(0,0,0,0.28);
+  --glow-orange: 0 0 0 1px rgba(247,147,26,0.15), 0 8px 32px -8px rgba(247,147,26,0.35);
+  --radius-lg: 18px;
+  --radius-md: 12px;
+}
+.dark {
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md: 0 12px 32px -8px rgba(0,0,0,0.55);
+  --shadow-lg: 0 32px 80px -16px rgba(0,0,0,0.7);
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-14px); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.glow-text {
+  background: linear-gradient(90deg, var(--orange), #ffcf8c, var(--orange));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 6s linear infinite;
+}
+.grid-overlay {
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 60% 50% at 50% 0%, black 40%, transparent 100%);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--paper);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+::selection {
+  background: var(--orange);
+  color: #0A0C0F;
+}
+
+:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+}
