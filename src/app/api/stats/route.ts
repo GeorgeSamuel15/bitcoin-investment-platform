@@ -17,7 +17,7 @@ export async function GET() {
       source: 'database',
       fetchedAt: new Date().toISOString(),
     });
-  } catch (err) {
+  } catch {
     // Database not migrated/connected yet — be explicit, don't guess.
     return NextResponse.json(
       { registeredUsers: null, totalBtcHeld: null, source: 'unavailable', error: 'Database not connected.' },

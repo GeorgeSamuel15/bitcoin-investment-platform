@@ -14,7 +14,7 @@ export default function ThemeToggle() {
     document.documentElement.classList.toggle('dark', next);
     try {
       localStorage.setItem('bi-theme', next ? 'dark' : 'light');
-    } catch (e) {
+    } catch {
       // localStorage unavailable (private browsing etc.) — theme just won't persist
     }
   }

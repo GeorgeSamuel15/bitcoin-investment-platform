@@ -31,7 +31,7 @@ export default function RegisterPage() {
   return (
     <div className="max-w-md mx-auto px-6 py-16">
       <h1 className="font-display font-semibold text-3xl mb-2" style={{ fontFamily: 'Space Grotesk' }}>Create your account</h1>
-      <p className="text-sm mb-8" style={{ color: 'var(--muted)' }}>Takes about a minute. You'll verify your identity next.</p>
+      <p className="text-sm mb-8" style={{ color: 'var(--muted)' }}>Takes about a minute. You&apos;ll verify your identity next.</p>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <input required placeholder="Full name" className="input" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />

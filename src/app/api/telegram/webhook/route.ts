@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 
 // Handles incoming updates from the Telegram Bot API. Verify the request
 // came from Telegram (secret token header) before trusting it in production.

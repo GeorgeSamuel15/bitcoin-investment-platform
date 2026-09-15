@@ -44,7 +44,12 @@ export default async function InvestPage() {
         <ul className="text-sm space-y-2" style={{ color: 'var(--muted)' }}>
           <li>Payment methods: bank transfer, card, stablecoin, or Bitcoin (availability depends on your region and provider setup).</li>
           <li>Custody: Bitcoin purchased on your behalf is intended to be held by a qualified/regulated custody provider — see <Link href="/strategy" className="underline">strategy details</Link>.</li>
-          <li>Withdrawal: subject to security checks and the platform's <Link href="/legal/withdrawal-policy" className="underline">withdrawal policy</Link>.</li>
+         <li>
+            Withdrawal: subject to security checks and the platform&apos;s{' '}
+       <Link href="/legal/withdrawal-policy" className="underline">
+            withdrawal policy
+       </Link>.
+      </li>
         </ul>
       </div>
 

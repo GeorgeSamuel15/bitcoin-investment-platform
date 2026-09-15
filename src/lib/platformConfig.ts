@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 
 // Admin-editable settings (spec section 6/24): min investment, fees,
@@ -18,21 +19,44 @@ const DEFAULTS: Record<string, unknown> = {
   regulatory_status: '[CONFIGURE BEFORE PRODUCTION]',
 };
 
-export async function getConfig<T = unknown>(key: string): Promise<T> {
+export async function getConfig<T = unknown>(
+  key: string
+): Promise<T> {
   try {
-    const row = await prisma.platformConfig.findUnique({ where: { key } });
-    if (row) return row.value as T;
+    const row = await prisma.platformConfig.findUnique({
+      where: { key },
+    });
+
+    if (row) {
+      return row.value as T;
+    }
   } catch {
     // DB not migrated yet
   }
+
   return DEFAULTS[key] as T;
 }
 
-export async function setConfig(key: string, value: unknown, updatedBy: string) {
+export async function setConfig(
+  key: string,
+  value: unknown,
+  updatedBy: string
+) {
+  const jsonValue = value as Prisma.InputJsonValue;
+
   return prisma.platformConfig.upsert({
     where: { key },
-    update: { value: value as any, updatedBy },
-    create: { key, value: value as any, updatedBy },
+
+    update: {
+      value: jsonValue,
+      updatedBy,
+    },
+
+    create: {
+      key,
+      value: jsonValue,
+      updatedBy,
+    },
   });
 }
 

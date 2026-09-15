@@ -30,7 +30,7 @@ export default function OfficialLinksPage() {
       </div>
 
       <div className="rounded-xl border p-5 mb-10" style={{ borderColor: 'var(--orange-dim)', background: 'color-mix(in srgb, var(--orange) 6%, transparent)' }}>
-        <p className="text-sm font-semibold mb-1">Never send Bitcoin to an administrator's personal wallet.</p>
+       <p className="text-sm font-semibold mb-1">Never send Bitcoin to an administrator&apos;s personal wallet.</p>
         <p className="text-sm" style={{ color: 'var(--muted)' }}>Never share your password, 2FA code, or private keys with anyone — including someone claiming to be staff.</p>
       </div>
 

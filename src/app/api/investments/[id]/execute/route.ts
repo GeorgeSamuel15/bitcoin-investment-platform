@@ -13,9 +13,15 @@ import { getMarketDataProvider } from '@/lib/providers/marketData';
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     await requirePermission('investments.execute');
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 403 });
-  }
+} catch (err: unknown) {
+  const message =
+    err instanceof Error ? err.message : 'Permission denied';
+
+  return NextResponse.json(
+    { error: message },
+    { status: 403 }
+  );
+}
 
   const order = await prisma.investmentOrder.findUnique({ where: { id: params.id } });
   if (!order) return NextResponse.json({ error: 'Order not found.' }, { status: 404 });

@@ -24,6 +24,7 @@ export class SandboxKycProvider implements KycProvider {
     return { providerRef: `sandbox_kyc_${userId}`, redirectUrl: undefined };
   }
   async getStatus(_providerRef: string): Promise<KycStatus> {
+    void _providerRef;
     // Sandbox never auto-approves; a human (or a real provider webhook)
     // still has to move a case out of "pending" via the admin KYC workflow.
     return 'pending';
@@ -39,6 +40,7 @@ export class SandboxPaymentProvider implements PaymentProvider {
     };
   }
   async getDepositStatus(_providerRef: string): Promise<PaymentIntent['status']> {
+    void _providerRef;
     // Deliberately stays "pending" — sandbox deposits are moved to
     // "completed" only through an explicit sandbox admin/testing action,
     // never automatically, so the flow mirrors a real webhook-driven system.
